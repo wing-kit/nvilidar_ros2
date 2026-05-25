@@ -8,22 +8,28 @@
 
 namespace nvilidar
 {
-	LidarDriverUDP::LidarDriverUDP(){
-		lidar_state.m_CommOpen = false;       
-		lidar_state.m_Scanning = false;        
+	//构造函数
+	LidarDriverUDP::LidarDriverUDP()
+	{
+		lidar_state.m_CommOpen = false;       //默认串口关闭
+		lidar_state.m_Scanning = false;         //默认扫描接口关闭
 	}
 
-	LidarDriverUDP::~LidarDriverUDP(){
+	//析构函数
+	LidarDriverUDP::~LidarDriverUDP()
+	{
 	}
 
-	//load para  
-	void LidarDriverUDP::LidarLoadConfig(Nvilidar_UserConfigTypeDef cfg){
-		lidar_cfg = cfg; 
-		LidarFilter::instance()->LidarFilterLoadPara(cfg.filter_para);                  
+	//加载参数 
+	void LidarDriverUDP::LidarLoadConfig(Nvilidar_UserConfigTypeDef cfg)
+	{
+		lidar_cfg = cfg;                   //配置参数生效
+		lidar_filter.LidarFilterLoadPara(cfg);	//加载参数 进过滤信息 
 	}
 
-	//Lidar connected or not
-	bool LidarDriverUDP::LidarIsConnected(){
+	//雷达是否连接
+	bool LidarDriverUDP::LidarIsConnected()
+	{
 		if (lidar_state.m_CommOpen)
 		{
 			return true;
@@ -31,13 +37,13 @@ namespace nvilidar
 		return false;
 	}
 
-	//lidar init 
+	//初始化 获取参数等信息 
 	bool LidarDriverUDP::LidarInitialialize()
 	{
-		Nvilidar_StoreConfigTypeDef store_para_read;		
-		bool save_flag = false;								
+		Nvilidar_StoreConfigTypeDef store_para_read;		//读出的参数  
+		bool save_flag = false;								//保存标记 
 
-		//para is valid?
+		//判断串口参数是否合法  
 		if ((lidar_cfg.ip_addr.length() == 0) || (lidar_cfg.lidar_udp_port == 0))
 		{
 			return false;		//网络参数信息不合法 
@@ -47,26 +53,20 @@ namespace nvilidar
 		if (!LidarConnect(lidar_cfg.ip_addr, lidar_cfg.lidar_udp_port))
 		{
 			nvilidar::console.error("Error initializing NVILIDAR scanner.");
-			return false;		//serialport connect fail 
-		}
+			return false;		//网络参数信息不合法 
+		}	
 
-		//send stop cmd 
+		//发送停止命令 
 		StopScan();
 		//sleep 
 		delayMS(300);
-		//create thread to read serialport data   
+		//创建线程 接收数据 
 		createThread();		
 		
-		//get lidar infomation 
+		//获取雷达信息 
 		if (false == GetDeviceInfo(lidar_cfg.deviceInfo))
 		{
 			nvilidar::console.warning("Error initializing NVILIDAR scanner.Failed to get Lidar Device Info.");
-			return false;
-		}
-		lidar_cfg.lidar_model_name = GetLidarModelName(lidar_cfg.deviceInfo);
-		if(lidar_cfg.lidar_model_name == NVILIDAR_Unknow)
-		{
-			nvilidar::console.error("current lidar is not support!\n");
 			return false;
 		}
 		nvilidar::console.show("\nlidar device info:");
@@ -75,93 +75,77 @@ namespace nvilidar
 		nvilidar::console.show("lidar hard version:%s", lidar_cfg.deviceInfo.m_HardVer.c_str());
 		nvilidar::console.show("lidar serialnumber:%s", lidar_cfg.deviceInfo.m_SerialNum.c_str());
 
-		//get lidar config para 
+		//获取雷达配置参数
 		if (false == GetLidarCfg(store_para_read))
 		{
 			nvilidar::console.warning("Error initializing NVILIDAR scanner.Failed to get Lidar Config Info.");
 			return false;
 		}
-		//get lidar angle offset 
-		if(false == GetZeroOffsetAngle(store_para_read.angleOffset)){
-			nvilidar::console.warning("Error initializing NVILIDAR scanner.Failed to get Lidar Angle Offset.");
-			return false;
-		}
-		if(lidar_cfg.lidar_model_name == NVILIDAR_ROC300){
-			//get lidar quality filter value 
-			if(false == GetFilterQualityThreshold(store_para_read.qualityFilterThreshold)){
-				nvilidar::console.warning("Error initializing NVILIDAR scanner.Failed to get Lidar Quality Filter Threshod.");
-			}
-		}
 
 #if 1
 		bool isNeedSetPara = false;
 		bool isSetOK = true;
-		//is same? 
-		if (lidar_cfg.storePara.samplingRate != store_para_read.samplingRate){
+		//判断参数是否一致 不一致则重置 
+		if (lidar_cfg.storePara.samplingRate != store_para_read.samplingRate)		//采样率 
+		{
 			isNeedSetPara = true;
-			if (!SetSamplingRate(lidar_cfg.storePara.samplingRate, store_para_read.samplingRate)){
+			if (!SetSamplingRate(lidar_cfg.storePara.samplingRate, store_para_read.samplingRate))
+			{
 				isSetOK = false;
 			}
 		}
-		if (lidar_cfg.storePara.aimSpeed != store_para_read.aimSpeed){
+		if (lidar_cfg.storePara.aimSpeed != store_para_read.aimSpeed)
+		{
 			isNeedSetPara = true;
-			if (!SetScanMotorSpeed(lidar_cfg.storePara.aimSpeed, store_para_read.aimSpeed)){
+			if (!SetScanMotorSpeed(lidar_cfg.storePara.aimSpeed, store_para_read.aimSpeed))
+			{
 				isSetOK = false;
 			}
 		}
-		if (lidar_cfg.storePara.isHasSensitive != store_para_read.isHasSensitive){
+		if (lidar_cfg.storePara.isHasSensitive != store_para_read.isHasSensitive)
+		{
 			isNeedSetPara = true;
-			if(!SetIntensities(lidar_cfg.storePara.isHasSensitive)){
+			if(!SetIntensities(lidar_cfg.storePara.isHasSensitive))
+			{
 				isSetOK = false;
 			}
 			store_para_read.isHasSensitive = lidar_cfg.storePara.isHasSensitive;
 		}
-		if (lidar_cfg.storePara.tailingLevel != store_para_read.tailingLevel){
+		if (lidar_cfg.storePara.tailingLevel != store_para_read.tailingLevel)
+		{
 			isNeedSetPara = true;
-			if (!SetTrailingLevel(lidar_cfg.storePara.tailingLevel, store_para_read.tailingLevel)){
+			if (!SetTrailingLevel(lidar_cfg.storePara.tailingLevel, store_para_read.tailingLevel))
+			{
 				isSetOK = false;
 			}
 		}
-		if(true == lidar_cfg.angle_offset_change_flag){			//angle offset 
-			if (lidar_cfg.storePara.angleOffset != store_para_read.angleOffset){
+		if (true == lidar_cfg.apd_change_flag)
+		{
+			if (lidar_cfg.storePara.apdValue != store_para_read.apdValue)
+			{
 				isNeedSetPara = true;
-				if(!SetZeroOffsetAngle(lidar_cfg.storePara.angleOffset, store_para_read.angleOffset)){
-					isSetOK = true;
-				}
-			}
-		}
-		if (true == lidar_cfg.apd_change_flag){					//apd value 				
-			if(lidar_cfg.lidar_model_name == NVILIDAR_ROC300){
-				if (lidar_cfg.storePara.apdValue != store_para_read.apdValue){
-					isNeedSetPara = true;
-					if (!SetApdValue(lidar_cfg.storePara.apdValue, store_para_read.apdValue)){
-						isSetOK = false;
-					}
-				}
-			}
-		}
-		if(true == lidar_cfg.quality_threshold_change_flag){		//quality threshold 
-			if(lidar_cfg.lidar_model_name == NVILIDAR_ROC300){
-				if(lidar_cfg.storePara.qualityFilterThreshold != store_para_read.qualityFilterThreshold){
-					isNeedSetPara = true;
-					if(!SetFilterQualityThreshold(lidar_cfg.storePara.qualityFilterThreshold,store_para_read.qualityFilterThreshold)){
-						isSetOK = false;
-					}
+				if (!SetApdValue(lidar_cfg.storePara.apdValue, store_para_read.apdValue))
+				{
+					isSetOK = false;
 				}
 			}
 		}
 		if (isNeedSetPara)
 		{
-			if (isSetOK){
+			if (isSetOK)
+			{
 				SaveCfg(save_flag);
-				if(save_flag){
+				if(save_flag)
+				{
 					nvilidar::console.show("NVILIDAR set para OK!");
 				}
-				else {
+				else 
+				{
 					nvilidar::console.show("NVILIDAR set para Fail!");
 				}
 			}
-			else{
+			else
+			{
 				nvilidar::console.warning("NVILIDAR set para Fail!");
 			}
 		}
@@ -173,18 +157,18 @@ namespace nvilidar
 		nvilidar::console.show("lidar frequency :%d.%02d", store_para_read.aimSpeed/100, store_para_read.aimSpeed%100);
 		nvilidar::console.show("lidar sesitive :%s", store_para_read.isHasSensitive ? "yes" : "no");
 		nvilidar::console.show("lidar tailling filter level :%d", store_para_read.tailingLevel);
-		nvilidar::console.show("lidar angle offset :%.2f",(double)store_para_read.angleOffset/64.0);
-		if(lidar_cfg.lidar_model_name == NVILIDAR_ROC300){
-			nvilidar::console.show("lidar apd value :%d",store_para_read.apdValue);
-			nvilidar::console.show("lidar quality filter threshold :%d\n",store_para_read.qualityFilterThreshold);
-		}
+		nvilidar::console.show("lidar apd value :%d",store_para_read.apdValue);
+
+		//sleep 
+		//delayMS(5);
 
 		return true;
 	}
 
-	//lidar start  
+	//启动雷达  
 	bool LidarDriverUDP::LidarTurnOn()
 	{
+		//启动雷达  
 		if (!StartScan())
 		{
 			StopScan();
@@ -194,19 +178,22 @@ namespace nvilidar
 			return false;
 		}
 
+		//包数为0了 
 		m_run_circles = 0;
-		//success 
+
+		//启动成功
 		nvilidar::console.message("[NVILIDAR INFO] Now NVILIDAR is scanning ......");
 
 		return true;
 	}
 
-	//lidar stop 
+	//启动雷达  
 	bool LidarDriverUDP::LidarTurnOff()
 	{
-		//stop 
+		//停止雷达输出 
 		StopScan();
 
+		//包数为0了 
 		m_run_circles = 0;
 
 		return true;
@@ -218,17 +205,17 @@ namespace nvilidar
 		return true;
 	}
 
-	//---------------------------------------private---------------------------------
+	//---------------------------------------私有类及接口---------------------------------
 
-	//lidar start 
+	//启动雷达
 	bool LidarDriverUDP::StartScan()
 	{
-		//serialport state 
+		//socket有没有开
 		if (!lidar_state.m_CommOpen)
 		{
 			return false;
 		}
-		//is running 
+		//是否正在运行
 		if (lidar_state.m_Scanning)
 		{
 			return true;
@@ -237,7 +224,7 @@ namespace nvilidar
 		//first circle false
 		m_first_circle_finish = false;
 
-		//send data 
+		//发送数据
 		if (!SendCommand(NVILIDAR_CMD_SCAN))
 		{
 			return false;
@@ -248,14 +235,13 @@ namespace nvilidar
 		return true;
 	}
 
-	//lidar stop 
+	//雷达停止
 	bool  LidarDriverUDP::StopScan()
 	{
-		//lidar is scanning 
+		//扫描标记清0
 		lidar_state.m_Scanning = false;
 
 		//发送数据
-		//send data 
 		SendCommand(NVILIDAR_CMD_STOP);
 
 		return true;
@@ -280,14 +266,14 @@ namespace nvilidar
 		return false;
 	}
 
-	//close serialport 
+	//关闭雷达串口接口 
 	void LidarDriverUDP::LidarDisconnect()
 	{
 		lidar_state.m_CommOpen = false;
 		socket_udp.udpClose();
 	}
 
-	//send serial 
+	//发送串口
 	bool LidarDriverUDP::SendUDP(const uint8_t *data, size_t size)
 	{
 		if (!lidar_state.m_CommOpen)
@@ -301,7 +287,7 @@ namespace nvilidar
 		}
 
 		
-		//write data   
+		//写数据 直到写完为止  
 		size_t r;
 		while (size) 
 		{
@@ -319,47 +305,52 @@ namespace nvilidar
 	}
 
 	//雷达发送数据
-	//send data 
-	bool LidarDriverUDP::SendCommand(uint8_t cmd, uint8_t *payload, uint16_t payloadsize)
+	bool LidarDriverUDP::SendCommand(uint8_t cmd, const void *payload, uint16_t payloadsize)
 	{
-		static uint8_t temp_buf[1024];
+		uint8_t pkt_header[sizeof(Nvilidar_ProtocolHeader)];
+		Nvilidar_ProtocolHeader *header = reinterpret_cast<Nvilidar_ProtocolHeader *>(pkt_header);
 		uint8_t checksum = 0;
+		uint8_t pkt_tail = NVILIDAR_END_CMD;     //包尾
 
-		//serialport not open 
+		//串口未打开 返回失败
 		if (!lidar_state.m_CommOpen)
 		{
 			return false;
 		}
 
-		if ((payload != nullptr) && (payloadsize > 0))   //command long or short 
+		if (payloadsize && payload)   //起始字节  根据有没有内容  来看是长命令字还是短命令字
 		{
-			temp_buf[0] = NVILIDAR_START_BYTE_LONG_CMD;
-			temp_buf[1] = cmd;
-			temp_buf[2] = (uint8_t)(payloadsize & 0xFF);
-			temp_buf[3] = (uint8_t)(payloadsize >> 8);
+			//长命令
+			header->startByte = NVILIDAR_START_BYTE_LONG_CMD;
+			header->cmd = cmd;
+			header->length = payloadsize;
 
-			for(int i = 0; i<payloadsize; i++){
-				temp_buf[4+i] = payload[i];
-				checksum ^= payload[i];
+			//计算校验值
+			for (size_t pos = 0; pos < payloadsize; ++pos)
+			{
+				checksum ^= ((uint8_t *)payload)[pos];
 			}
-			temp_buf[4+payloadsize] = checksum;
-			temp_buf[5+payloadsize] = NVILIDAR_END_CMD;
 
-			SendUDP(temp_buf,6+payloadsize);
+			uint16_t sizebyte = (uint8_t)(payloadsize);
+
+			//开始进行发送
+			SendUDP(pkt_header, 4);       //包头 长度信息
+			SendUDP((const uint8_t *)payload, sizebyte);   //发送数据信息
+			SendUDP(&checksum, 1);         //校验值
+			SendUDP(&pkt_tail, 1);         //包尾
 		}
 		else
 		{
-			//short command 
-			temp_buf[0] = NVILIDAR_START_BYTE_SHORT_CMD;
-			temp_buf[1] = cmd;
-			
-			SendUDP(temp_buf, 2);
+			//短命令
+			header->startByte = NVILIDAR_START_BYTE_SHORT_CMD;
+			header->cmd = cmd;
+			SendUDP(pkt_header, 2);
 		}
 
 		return true;
 	}
 
-	//normal data unpack 
+	//普通数据解包 
 	void LidarDriverUDP::NormalDataUnpack(uint8_t *buf, uint16_t len)
 	{
 		static uint8_t   crc = 0;												//CRC校验值 
@@ -372,7 +363,7 @@ namespace nvilidar
 
 			switch (normal_recvPos)
 			{
-				case 0:		//first byte 
+				case 0:		//第一个字节  
 				{
 					if (byte == NVILIDAR_START_BYTE_LONG_CMD)
 					{
@@ -384,7 +375,7 @@ namespace nvilidar
 						break;
 					}
 				}
-				case 1:		//second byte   
+				case 1:		//第2个字节  
 				{
 					if (
 							(byte == NVILIDAR_CMD_GET_DEVICE_INFO) ||
@@ -397,8 +388,6 @@ namespace nvilidar
 							(byte == NVILIDAR_CMD_SAVE_LIDAR_PARA) ||
 							(byte == NVILIDAR_CMD_GET_ANGLE_OFFSET) ||
 							(byte == NVILIDAR_CMD_SET_ANGLE_OFFSET) ||
-							(byte == NVILIDAR_CMD_GET_QUALITY_THRESHOLD) ||
-							(byte == NVILIDAR_CMD_SET_QUALITY_THRESHOLD) ||
 							(byte == NVILIDAR_CMD_SET_APD_VALUE)
 						)
 					{
@@ -412,21 +401,21 @@ namespace nvilidar
 					}
 					break;
 				}
-				case 2:		//third byte   
+				case 2:		//第3个字节  
 				{
 					normalResponseData.length = byte;
 					normal_recvPos++;
 					break;
 				}
-				case 3:		
+				case 3:		//第4个字节  
 				{
 					normalResponseData.length += byte * 256;
 					normal_recvPos++;
 					break;
 				}
-				default:	
+				default:	//第5个及后续所有字节 
 				{
-					if (normal_recvPos < normalResponseData.length + sizeof(Nvilidar_ProtocolHeader))			  
+					if (normal_recvPos < normalResponseData.length + sizeof(Nvilidar_ProtocolHeader))			//中间有效数据  
 					{
 						if (normal_recvPos >= sizeof(Nvilidar_ProtocolHeader))
 						{
@@ -472,10 +461,10 @@ namespace nvilidar
 							break;
 						}
 
-						//data analysis 
+						//调用协议解析接口 
 						NormalDataAnalysis(normalResponseData);
 
-						//value recovery  
+						//指针回到0位 
 						normalResponseData.length = 0;
 						normalResponseData.cmd = 0;
 						crc = 0;
@@ -600,22 +589,22 @@ namespace nvilidar
 
 				break;
 			}
-			case NVILIDAR_CMD_SAVE_LIDAR_PARA:	//write finish   
+			case NVILIDAR_CMD_SAVE_LIDAR_PARA:	//写参数存储  
 			{
 				if(data.length != sizeof(recv_info.saveFlag))
 				{
 					break;
 				}
 				memcpy((char *)(&recv_info.saveFlag), data.dataInfo, data.length);
-				recv_info.recvFinishFlag = true;		//recv finish   
+				recv_info.recvFinishFlag = true;		//接收成功  
 
-				//unlock 
-				setNormalResponseUnlock();				
+				//设置event 失效  
+				setNormalResponseUnlock();				//解锁 
 
 				break;
 			}
-			case NVILIDAR_CMD_GET_ANGLE_OFFSET:	//read angle offset  
-			case NVILIDAR_CMD_SET_ANGLE_OFFSET:	//write angle offset  
+			case NVILIDAR_CMD_GET_ANGLE_OFFSET:	//读角度偏移 
+			case NVILIDAR_CMD_SET_ANGLE_OFFSET:	//读角度偏移 
 			{
 				if (data.length != sizeof(recv_info.angleOffset))
 				{
@@ -625,22 +614,8 @@ namespace nvilidar
 				memcpy((char *)(&recv_info.angleOffset), data.dataInfo, data.length);
 				recv_info.recvFinishFlag = true;		//接收成功 
 
-				//unlock 
-				setNormalResponseUnlock();				
-
-				break;
-			}
-			case NVILIDAR_CMD_GET_QUALITY_THRESHOLD:  	//get the quality filter value
-			case NVILIDAR_CMD_SET_QUALITY_THRESHOLD:{	//set the quality filter value 
-				if (data.length != sizeof(recv_info.qualityFilter)){
-					break;
-				}
-
-				memcpy((char *)(&recv_info.qualityFilter), data.dataInfo, data.length);
-				recv_info.recvFinishFlag = true;		
-
-				//unlock 
-				setNormalResponseUnlock();		
+				//设置event失效 
+				setNormalResponseUnlock();				//解锁 
 
 				break;
 			}
@@ -656,8 +631,12 @@ namespace nvilidar
 	{
 		static Nvilidar_PointViewerPackageInfoTypeDef  pack_info;        //包信息
 
-		static  uint16_t   checksum_temp = 0; 					//校验计算 for 2byte
+		static uint16_t    package_first_angle_temp = 0;   		//起始角
+		static uint16_t    package_last_angle_temp = 0;    		//结束角
+		static uint16_t    package_speed_temp = 0;              //转速信息
+		static uint16_t    package_temperature_temp = 0;        //温度信息
 		static uint32_t    package_after_0c_index = 0;          //0度后的第几包
+		static uint16_t    checksum_speed_temp = 0;        		//校验计算
 		static uint16_t    checksum_packnum_index = 0;     		//包数目和0位索引校验
 
 		static int         recvPos = 0;							//当前接到的位置信息
@@ -700,18 +679,22 @@ namespace nvilidar
 				}
 				case 2:     //频率或温度等信息
 				{
-					checksum_temp = byte;     //校验赋值
+					checksum_speed_temp = byte;     //校验赋值
 
 					//0度角或其它信息
 					if (1 == package_after_0c_index)  //其它  0位后第1包为  温度值
 					{
 						pack_info.packageHas0CFirst = false;
 						pack_info.packageHasTempFirst = true;
+
+						package_temperature_temp = byte;
 					}
 					else if (byte & 0x01)     //最低位是0位
 					{
 						pack_info.packageHas0CFirst = true;
 						pack_info.packageHasTempFirst = false;
+
+						package_speed_temp = byte;
 					}
 					else        //其它情况  该位置不含其它信息
 					{
@@ -723,8 +706,8 @@ namespace nvilidar
 				}
 				case 3:         //频率或者温度
 				{
-					checksum_temp += (byte * 256);     //校验计算
-					pack_info.packageCheckSumCalc ^= checksum_temp; //校验计算
+					checksum_speed_temp += (byte * 256);     //校验计算
+					pack_info.packageCheckSumCalc ^= checksum_speed_temp; //校验计算
 
 
 					if (pack_info.packageHas0CFirst)  //可能有0度
@@ -738,8 +721,8 @@ namespace nvilidar
 							package_after_0c_index = 0;     //0位包  则将0度后的个数  清0
 
 							pack_info.packageHas0CAngle = true;
-							checksum_temp += ((uint16_t)byte * 256);
-							pack_info.packageFreq = (checksum_temp & 0x7FFF) >> 1;
+							package_speed_temp += ((uint16_t)byte * 256);
+							pack_info.packageFreq = (package_speed_temp & 0x7FFF) >> 1;
 						}
 						else
 						{
@@ -755,8 +738,8 @@ namespace nvilidar
 
 
 						pack_info.packageHasTemp = true;
-						checksum_temp += ((uint16_t)byte * 256);
-						pack_info.packageTemp = (int16_t)(checksum_temp);
+						package_temperature_temp += ((uint16_t)byte * 256);
+						pack_info.packageTemp = (int16_t)(package_temperature_temp);
 					}
 					else
 					{
@@ -812,7 +795,7 @@ namespace nvilidar
 				{
 					if (byte & NVILIDAR_RESP_MEASUREMENT_CHECKBIT)
 					{
-						checksum_temp = byte;
+						package_first_angle_temp = byte;
 						recvPos++;      //index后移
 					}
 					else
@@ -824,9 +807,9 @@ namespace nvilidar
 				}
 				case 7:             //起始角度高位
 				{
-					checksum_temp += (uint16_t)byte * 256;
-					pack_info.packageCheckSumCalc ^= checksum_temp;
-					pack_info.packageFirstAngle = checksum_temp >> 1;
+					package_first_angle_temp += (uint16_t)byte * 256;
+					pack_info.packageCheckSumCalc ^= package_first_angle_temp;
+					pack_info.packageFirstAngle = package_first_angle_temp >> 1;
 
 					//printf("first angle = %f\n",(float)pointViewerPackageInfo.packageFirstAngle/64.0f);
 
@@ -837,7 +820,7 @@ namespace nvilidar
 				{
 					if (byte & NVILIDAR_RESP_MEASUREMENT_CHECKBIT)
 					{
-						checksum_temp = byte;
+						package_last_angle_temp = byte;
 
 						//  printf("last_angle_l = %d\n",package_last_angle_temp);
 
@@ -852,9 +835,9 @@ namespace nvilidar
 				}
 				case 9:             //结束角高位
 				{
-					checksum_temp += (uint16_t)byte * 0x100;
-					pack_info.packageCheckSumCalc ^= checksum_temp;
-					pack_info.packageLastAngle = checksum_temp >> 1;
+					package_last_angle_temp += (uint16_t)byte * 0x100;
+					pack_info.packageCheckSumCalc ^= package_last_angle_temp;
+					pack_info.packageLastAngle = package_last_angle_temp >> 1;
 
 					//printf("last angle = %f\n",(float)packageInfo.packageLastAngle/64.0f);
 
@@ -957,7 +940,11 @@ namespace nvilidar
 						}
 						//清空所有数据  
 						memset((uint8_t *)(&pack_info), 0x00, sizeof(Nvilidar_PointViewerPackageInfoTypeDef));
-						checksum_temp = 0;        				//临时校验信息 
+						package_first_angle_temp = 0;   		//起始角
+						package_last_angle_temp = 0;    		//结束角
+						package_speed_temp = 0;              //转速信息
+						package_temperature_temp = 0;        //温度信息
+						checksum_speed_temp = 0;        		//校验计算
 						checksum_packnum_index = 0;     		//包数目和0位索引校验
 						recvPos = 0;                    //当前接到的位置信息
 						remain_size = 0;			//接完包头剩下来的数据信息 
@@ -1117,6 +1104,8 @@ namespace nvilidar
 			{
 				setCircleResponseUnlock();		//解锁  告知已接到一包数据信息 
 			}
+
+			delayMS(5);
 		}
 	}
 
@@ -1358,56 +1347,6 @@ namespace nvilidar
 		return false;
 	}
 
-	//get the lidar quality filter 
-	bool LidarDriverUDP::GetFilterQualityThreshold(uint16_t &ret_filter_quality,uint32_t timeout){
-		recv_info.recvFinishFlag = false;
-
-		//先停止雷达 如果雷达在运行 
-		if(lidar_state.m_Scanning){
-			StopScan();
-		}
-
-		//发送命令
-		if (!SendCommand(NVILIDAR_CMD_GET_QUALITY_THRESHOLD)){
-			return false;
-		}
-
-		//等待线程同步 超时 
-		if (waitNormalResponse(timeout)){
-			if (recv_info.recvFinishFlag){
-				ret_filter_quality = recv_info.qualityFilter;
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	//set the lidar quality filter 
-	bool LidarDriverUDP::SetFilterQualityThreshold(uint16_t filter_quality_set, uint16_t &ret_filter_quality,uint32_t timeout){
-		recv_info.recvFinishFlag = false;
-
-		//先停止雷达 如果雷达在运行 
-		if(lidar_state.m_Scanning){
-			StopScan();
-		}
-
-		//发送命令
-		if (!SendCommand(NVILIDAR_CMD_SET_QUALITY_THRESHOLD,(uint8_t *)(&filter_quality_set), sizeof(filter_quality_set))){
-			return false;
-		}
-
-		//等待线程同步 超时 
-		if (waitNormalResponse(timeout)){
-			if (recv_info.recvFinishFlag){
-				ret_filter_quality = recv_info.qualityFilter;
-				return true;
-			}
-		}
-
-		return false;
-	}
-
 	//设置拖尾等级
 	bool LidarDriverUDP::SetTrailingLevel(uint8_t tailing_set, uint8_t &tailing,
 		uint32_t  timeout)
@@ -1543,36 +1482,8 @@ namespace nvilidar
 		return lidar_state.m_Scanning;
 	}
 
-	//get lidar name  
-	LidarModelListEnumTypeDef LidarDriverUDP::GetLidarModelName(Nvilidar_DeviceInfo info){
-		std::string modelNum_String = info.m_ProductName;
-		std::string::size_type pos;
-
-		//ROC300
-		pos = modelNum_String.find("VP300");
-		if(pos != std::string::npos){
-			return NVILIDAR_ROC300;
-		}
-		pos = modelNum_String.find("R300");
-		if(pos != std::string::npos){
-			return NVILIDAR_ROC300;
-		}
-
-		//VP350 
-		pos = modelNum_String.find("VP350");
-		if(pos != std::string::npos){
-			return NVILIDAR_VP350;
-		}
-		pos = modelNum_String.find("VP351");
-		if(pos != std::string::npos){
-			return NVILIDAR_VP350;
-		}
-
-		return NVILIDAR_Unknow;
-	}
-
-	//---------------------------------------------thread API----------------------------------------------
-	//init thread 
+	//---------------------------------------------多线程API----------------------------------------------
+	//初始化线程 
 	bool LidarDriverUDP::createThread()
 	{
 		#if	defined(_WIN32)
@@ -1636,13 +1547,13 @@ namespace nvilidar
 
 			return true;
 		#else 
-			//sync connect  
+			//正常协议解析同步  
 			pthread_cond_init(&_cond_analysis, NULL);
     		pthread_mutex_init(&_mutex_analysis, NULL);
 			pthread_cond_init(&_cond_point, NULL);
     		pthread_mutex_init(&_mutex_point, NULL);
 
-			//create thread 
+			/* 创建线程pthread */
      		if(-1 == pthread_create(&_thread, NULL, LidarDriverUDP::periodThread, this))
      		{
 				 _thread = -1;
@@ -1654,7 +1565,7 @@ namespace nvilidar
 		#endif 
 	}
 
-	//close thread 
+	//关闭线程 
 	void LidarDriverUDP::closeThread()
 	{
 		#if	defined(_WIN32)
@@ -1671,7 +1582,7 @@ namespace nvilidar
 		#endif 
 	}
 
-	//wait for response 
+	//等待事件 
 	bool LidarDriverUDP::waitNormalResponse(uint32_t timeout)
 	{
 		#if	defined(_WIN32)
@@ -1726,18 +1637,16 @@ namespace nvilidar
 			DWORD state;
 			ResetEvent(_event_circle);		// 重置事件，让其他线程继续等待（相当于获取锁）
 			state = WaitForSingleObject(_event_circle, timeout);
-			if (state == WAIT_OBJECT_0){
-				//data filter 
-				node_in = circleDataInfo.lidarCircleNodePoints;
-				LidarFilter::instance()->LidarNoiseFilter(node_in,circleDataInfo.lidarCircleNodePoints);
-				//filter change 
+			if (state == WAIT_OBJECT_0)
+			{
+				//点集格式转换 
 				LidarSamplingData(circleDataInfo, scan);
+
 				return true;
 			}	
 		#else 
 			struct timeval now;
     		struct timespec outtime;
-			std::vector<Nvilidar_Node_Info> node_in;
 			int state = -1;
 
 			pthread_mutex_lock(&_mutex_point);
@@ -1749,12 +1658,16 @@ namespace nvilidar
 			state = pthread_cond_timedwait(&_cond_point, &_mutex_point, &outtime);
 			pthread_mutex_unlock(&_mutex_point);
 
-			if(0 == state){
-				//data filter 
-				node_in = circleDataInfo.lidarCircleNodePoints;
-				LidarFilter::instance()->LidarNoiseFilter(node_in,circleDataInfo.lidarCircleNodePoints);
-				//filter change 
+			if(0 == state)
+			{
+				if(lidar_cfg.filter_jump_enable)
+				{
+					//一圈数据  输出后 是否做其它数据 
+					lidar_filter.LidarJumpFilter(circleDataInfo.lidarCircleNodePoints);
+				}
+				//点集格式转换 
 				LidarSamplingData(circleDataInfo, scan);
+
 				return true;
 			}
 		#endif
@@ -1768,8 +1681,12 @@ namespace nvilidar
 		uint32_t all_nodes_counts = 0;		//所有点数  不做截取等用法 
 		uint64_t scan_time = 0;				//2圈点的扫描间隔 
 
+
 		//扫描时间 
 		scan_time = info.stopStamp - info.startStamp;
+
+		//清空接收数据  
+		outscan.points.clear();
 
 		//原始数据  计数
 		uint32_t lidar_ori_count = info.lidarCircleNodePoints.size();
@@ -1792,12 +1709,15 @@ namespace nvilidar
 			lidar_cfg.angle_max = temp;
 		}
 
-		//以角度为比例  计算输出信息 
+		//以角度为比例  计算真实的点数信息 
+		int output_count = all_nodes_counts * ((lidar_cfg.angle_max - lidar_cfg.angle_min) / 360.0f);
+
 		outscan.stamp = info.startStamp;
 		outscan.config.max_angle = lidar_cfg.angle_max*M_PI / 180.0;			//计算最大角度  				
 		outscan.config.min_angle = lidar_cfg.angle_min*M_PI / 180.0;			//计算最小角度  
-		outscan.config.angle_increment = 2.0 * M_PI/(double)(all_nodes_counts - 1);	//计算2点之间的角度增量 
-			
+		outscan.config.angle_increment = (outscan.config.max_angle -	//计算2点之间的角度增量 		
+			outscan.config.min_angle) /
+			(double)(output_count - 1);
 		outscan.config.scan_time = static_cast<float>(1.0 * scan_time / 1e9);  	//扫描时间信息  
 		outscan.config.time_increment = outscan.config.scan_time / (double)(all_nodes_counts - 1); 	//2点之间的时间 
 		outscan.config.min_range = lidar_cfg.range_min;
@@ -1808,7 +1728,6 @@ namespace nvilidar
 		float angle = 0.0;
 		float intensity = 0.0;
 		unsigned int i = 0;
-		outscan.points.clear();		//clear vector 
 
 		//从雷达原始数据中  提取数据  
 		for (; i < lidar_ori_count; i++)
@@ -1817,6 +1736,7 @@ namespace nvilidar
 			intensity = static_cast<float>(info.lidarCircleNodePoints.at(i).lidar_quality);
 			angle = static_cast<float>(info.lidarCircleNodePoints.at(i).lidar_angle);
 			angle = angle * M_PI / 180.0;
+			angle = 2 * M_PI - angle;
 
 			//Rotate 180 degrees or not
 			if (lidar_cfg.reversion)
@@ -1824,10 +1744,11 @@ namespace nvilidar
 				angle = angle + M_PI;
 			}
 			//Is it counter clockwise
-			if (!lidar_cfg.inverted)
+			if (lidar_cfg.inverted)
 			{
 				angle = 2 * M_PI - angle;
 			}
+
 
 			//忽略点（事先配置好哪个角度的范围）
 			if (lidar_cfg.ignore_array.size() != 0)
@@ -1846,7 +1767,7 @@ namespace nvilidar
 					}
 				}
 			}
-
+			
 			//-pi ~ pi
 			angle = fmod(fmod(angle, 2.0 * M_PI) + 2.0 * M_PI, 2.0 * M_PI);
 			if (angle > M_PI)
@@ -1863,7 +1784,8 @@ namespace nvilidar
 
 			//角度是否在有效范围内 
 			if ((angle >= outscan.config.min_angle) &&
-				(angle <= outscan.config.max_angle)){
+				(angle <= outscan.config.max_angle))
+			{
 				NviLidarPoint point;
 				point.angle = angle;
 				point.range = dist;
@@ -1872,12 +1794,15 @@ namespace nvilidar
 				outscan.points.push_back(point);
 			}
 		}
-		//fill 
+
+		//打印一下 
+		//printf("out_count:%d,calc_count:%d,increse:%lf\n",outscan.points.size(),output_count,outscan.config.angle_increment);
+
+		//如果固定角度分辨率 则resize 
 		if (lidar_cfg.resolution_fixed)
 		{
-			int output_count = all_nodes_counts * ((outscan.config.max_angle - outscan.config.min_angle) / M_PI / 2);
-			outscan.points.resize(output_count);
-		}	
+			outscan.points.resize(all_nodes_counts);
+		}
 	}
 
 	//等待一圈点云 事件 解锁 
@@ -1913,6 +1838,7 @@ namespace nvilidar
 					{
 						pObj->NormalDataUnpack(recv_data, recv_len);
 					}
+					delayMS(3);		//必须要加sleep 不然会超高占用cpu	
 				}
 				//解包处理 ==== 点云解包 
 				else 
@@ -1924,8 +1850,6 @@ namespace nvilidar
 						pObj->PointDataUnpack(recv_data, recv_len);
 					}
 				}
-
-				delayMS(1);		//必须要加sleep 不然会超高占用cpu	
 			}
 
 			return 0;
@@ -1951,6 +1875,7 @@ namespace nvilidar
 					{
 						pObj->NormalDataUnpack(recv_data, recv_len);
 					}
+					delayMS(3);		//必须要加sleep 不然会超高占用cpu	
 				}
 				//解包处理 ==== 点云解包 
 				else 
@@ -1962,8 +1887,6 @@ namespace nvilidar
 						pObj->PointDataUnpack(recv_data, recv_len);
 					}
 				}
-
-				delayMS(1);		//必须要加sleep 不然会超高占用cpu	
 			}
 
 			return 0;

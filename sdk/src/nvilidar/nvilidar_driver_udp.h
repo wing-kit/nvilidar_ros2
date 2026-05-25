@@ -44,91 +44,92 @@ namespace nvilidar
 			LidarDriverUDP();                //构造函数
 			~LidarDriverUDP();           //析构函数
 
-			void LidarLoadConfig(Nvilidar_UserConfigTypeDef cfg);
-			bool LidarIsConnected();			//is lidar connected 
-			bool LidarGetScanState();			//is lidar transing data 
-			bool LidarInitialialize();			//lidar init 
-			bool LidarCloseHandle();			//lidar quit and disconnect 
-			bool LidarTurnOn();					//start scan    
-			bool LidarTurnOff();				//stop scan 
+			void LidarLoadConfig(Nvilidar_UserConfigTypeDef cfg);	//加载参数  替代构造函数  
+			bool LidarIsConnected();			//雷达是否连接
+			bool LidarGetScanState();			//获取传输状态  
+			bool LidarInitialialize();			//雷达初始化 获取参数配置参数等 
+			bool LidarCloseHandle();			//雷达断开连接  
+			bool LidarTurnOn();				//启动扫描  
+			bool LidarTurnOff();				//停止扫描
 
 
-			std::string getSDKVersion();										//get current sdk version 
-			bool StartScan(void);                           //start scan 
-			bool StopScan(void);                            //stop scan 
-			bool Reset(void);								//lidar reset 
+			//串口 版本号等信息
+			std::string getSDKVersion();										//获取当前sdk版本号
+			bool StartScan(void);                           //启动扫图
+			bool StopScan(void);                            //停止扫描
+			bool Reset(void);								//雷达复位
 
-			bool SetIntensities(const uint8_t has_intensity, uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);     //set lidar has/has not sensitive 
+			bool SetIntensities(const uint8_t has_intensity, uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);     //设置是否有信号质量
 			bool GetDeviceInfo(Nvilidar_DeviceInfo & info, uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);
-			bool SetScanMotorSpeed(uint16_t frequency_add, uint16_t &ret_frequency,    						//set lidar aim speed 
+			bool SetScanMotorSpeed(uint16_t frequency_add, uint16_t &ret_frequency,    //设置雷达目标转速
 													uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);
 			bool SetSamplingRate(uint32_t rate_add, uint32_t &rate,
-											uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);   	//set lidar sampling 
+											uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);   //雷达采样率增加
 			bool SetTrailingLevel(uint8_t tral_set, uint8_t &tral,
 												uint32_t  timeout = NVILIDAR_DEFAULT_TIMEOUT);
 			bool SetApdValue(uint16_t apd_set, uint16_t &apd,
-											uint32_t  timeout = NVILIDAR_DEFAULT_TIMEOUT);		//set lidar apd value 
+											uint32_t  timeout = NVILIDAR_DEFAULT_TIMEOUT);	//set lidar apd value 
 
-			bool GetLidarCfg(Nvilidar_StoreConfigTypeDef &info,									//get config para 
+			//获取配置信息
+			bool GetLidarCfg(Nvilidar_StoreConfigTypeDef &info,
 												uint32_t  timeout = NVILIDAR_DEFAULT_TIMEOUT);
 
-			bool GetZeroOffsetAngle(int16_t &angle,												//lidar lidar 0 offset 
+			bool GetZeroOffsetAngle(int16_t &angle,			//设置0度偏移
 												uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);
 			bool SetZeroOffsetAngle(int16_t angle_set, int16_t &angle,
-												uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT); 	//get lidar 0 offset 
+												uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT); //读取0度偏移
+			//保存参数
+			bool SaveCfg(bool &flag,uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);
 
-			bool GetFilterQualityThreshold(uint16_t &ret_filter_quality,uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);	 //get lidar filter quality 
+			//最终输出数据  一圈点云的数据  
+			bool LidarSamplingProcess(LidarScan &scan, uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);
 
-			bool SetFilterQualityThreshold(uint16_t filter_quality_set, uint16_t &ret_filter_quality,
-												uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);	//set lidar filter quality value 
-
-			bool SaveCfg(bool &flag,uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);				//save para
-
-			bool LidarSamplingProcess(LidarScan &scan, uint32_t timeout = NVILIDAR_DEFAULT_TIMEOUT);  //lidar data output 
-
-			Nvilidar_PackageStateTypeDef   lidar_state;											//lidar state 
+			////变量 
+			Nvilidar_PackageStateTypeDef   lidar_state;				//雷达状态
 
 		private:
-			bool LidarConnect(std::string ip_addr, uint16_t port);  //serialport init 
-			void LidarDisconnect();      //close udp  
-			bool SendUDP(const uint8_t *data, size_t size);      //send data to udp  
-			bool SendCommand(uint8_t cmd, uint8_t *payload = NULL,uint16_t payloadsize = 0);
-			void NormalDataUnpack(uint8_t *buf, uint16_t len);		//unpack（normal data）
+			bool LidarConnect(std::string ip_addr, uint16_t port);  //串口初始化
+			void LidarDisconnect();      //关闭串口
+			bool SendUDP(const uint8_t *data, size_t size);      //发送接口  私有类 
+			bool SendCommand(uint8_t cmd, const void *payload = NULL,uint16_t payloadsize = 0);
+			void NormalDataUnpack(uint8_t *buf, uint16_t len);		//解包（普通数据解包）
 			void NormalDataAnalysis(Nvilidar_Protocol_NormalResponseData data);	
-			bool PointDataUnpack(uint8_t *byte, uint16_t len);		//unpack（point cloud）
+			bool PointDataUnpack(uint8_t *byte, uint16_t len);		//解包（点云数据解包）
 			void PointDataAnalysis(Nvilidar_PointViewerPackageInfoTypeDef data);	
-			LidarModelListEnumTypeDef GetLidarModelName(Nvilidar_DeviceInfo info);			//get lidar model name  
 			
-			//thread  
-			bool createThread();		//create thread 
-			void closeThread();			//close thread 
-			bool waitNormalResponse(uint32_t timeout = NVILIDAR_POINT_TIMEOUT);	//wait for lidar response nomal data 
-			void setNormalResponseUnlock();	//unlock nomal data  
-			void setCircleResponseUnlock();	//unlock point data 
-			void LidarSamplingData(CircleDataInfoTypeDef info, LidarScan &outscan);		//interface for lidar point data 
+			//线程相关 
+			bool createThread();		//创建线程 
+			void closeThread();			//关闭线程 
+			bool waitNormalResponse(uint32_t timeout = NVILIDAR_POINT_TIMEOUT);	//等待雷达应答 
+			void setNormalResponseUnlock();	//解锁 
+			void setCircleResponseUnlock();	//解锁 
+			void LidarSamplingData(CircleDataInfoTypeDef info, LidarScan &outscan);		//拆包 
 
-			//----------------------network---------------------------
+			//----------------------网络类---------------------------
 
 			nvilidar_socket::Nvilidar_Socket_UDP socket_udp;
 
-			//----------------------value ----------------------------
-			Nvilidar_UserConfigTypeDef     lidar_cfg;				//lidar config data 
-			CircleDataInfoTypeDef		   circleDataInfo;			//lida circle data  
-			NvilidarRecvInfoTypeDef		   recv_info;				//lidar receive data 
+			//-----------------------过滤信息------------------------
+			nvilidar::LidarFilter lidar_filter;
 
-			uint32_t    m_0cIndex = 0;                  //0 index
-			int32_t     m_last0cIndex = 0;              //0 index
-			uint32_t    m_differ0cIndex = 0;            //0 index
+			//-----------------------变量----------------------------
+			Nvilidar_UserConfigTypeDef     lidar_cfg;				//雷达型号
+			CircleDataInfoTypeDef		   circleDataInfo;			//一圈的点云数据 
+			NvilidarRecvInfoTypeDef		   recv_info;				//接收信息 
+
+			uint32_t    m_0cIndex = 0;                  //0度所用的index
+			int32_t     m_last0cIndex = 0;              //0度所用的index
+			uint32_t    m_differ0cIndex = 0;            //0度所用的index
 			bool        m_first_circle_finish = false;  //first circle finish,case calc fault
-			uint64_t	m_run_circles = 0;				//has send data   
+			uint64_t	m_run_circles = 0;				//从启动开始  已经发了几包的数据  
 
-			//---------------------thread---------------------------
+			//---------------------线程相关---------------------------
 			#if defined(_WIN32)
 				HANDLE  _thread = NULL;
-				HANDLE  _event_analysis;		
-				HANDLE  _event_circle;			
+				HANDLE  _event_analysis;		//协议解析 
+				HANDLE  _event_circle;			//一圈点数据信息 
 
-				DWORD static WINAPI periodThread(LPVOID lpParameter);		//thread  
+				DWORD static WINAPI periodThread(LPVOID lpParameter);		//线程进程  定时调用接口 
 			#else 
 				pthread_t _thread = -1;
 				pthread_cond_t _cond_analysis;

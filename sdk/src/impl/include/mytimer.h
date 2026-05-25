@@ -12,29 +12,29 @@
 #endif 
 
 #if defined(_WIN32)
-	//get corrent ns
+	//获取当前ns数
 	inline uint64_t getStamp(void)
 	{
 		FILETIME		t;
-		GetSystemTimeAsFileTime(&t);		//get 100ns time (for 100ns min)
+		GetSystemTimeAsFileTime(&t);		//此函数接口获取的是100ns的时间戳 
 		return ((((uint64_t)t.dwHighDateTime) << 32) | ((uint64_t)t.dwLowDateTime)) *
 			100;
 	}
 
-	//get current ms 
+	//获取到当前ms数 
 	inline uint64_t getMS(void)
 	{
 		return GetTickCount();
 	}
 
-	//dalay for some time 
+	//延时 
 	inline void delayMS(uint32_t ms)
 	{
 		Sleep(ms);
 	}
 
 #else 
-	//get current ns 
+	//获取当前ns数
 	inline uint64_t getStamp(void)
 	{
 		#if 1
@@ -49,7 +49,7 @@
 		#endif
 	}
 
-	//sleep for some ms 
+	//延时 
 	inline void delayMS(uint32_t ms)
 	{
 		usleep(ms*1000);

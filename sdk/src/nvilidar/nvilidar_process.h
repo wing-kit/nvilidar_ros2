@@ -23,7 +23,7 @@
 	#define NVILIDAR_API
 #endif // ifdef WIN32
 
-//communicate type 
+//枚举定义 
 typedef enum
 {
 	USE_SERIALPORT = 1,

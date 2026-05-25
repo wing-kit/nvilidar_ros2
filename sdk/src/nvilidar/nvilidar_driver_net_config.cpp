@@ -8,11 +8,13 @@
 
 namespace nvilidar
 {
+	//构造函数
 	LidarDriverNetConfig::LidarDriverNetConfig()
 	{
-		m_CommOpen = false;       //serial default close 
+		m_CommOpen = false;       //默认串口关闭
 	}
 
+	//析构函数
 	LidarDriverNetConfig::~LidarDriverNetConfig()
 	{
 		NetConfigDisconnect();
@@ -20,60 +22,60 @@ namespace nvilidar
 
 	void LidarDriverNetConfig::LidarLoadConfig(Nvilidar_UserConfigTypeDef cfg)
 	{
-		net_config_cfg = cfg;                   //para avaliable 
+		net_config_cfg = cfg;                   //配置参数生效
 	}
 
-	//network para config 
+	//配置参数信息 
 	bool LidarDriverNetConfig::LidarNetConfigWrite(std::string ip,std::string gate,std::string mask)
 	{	
 		Nvilidar_NetConfigTypeDef cfg;
 
-		//change string to ip 
+		//转换 
 		ip_str2char(ip,&cfg.IP_addr[0]);
 		ip_str2char(gate,&cfg.GateWay[0]);
 		ip_str2char(mask,&cfg.Mask[0]);
 
-		//show 
+		//设置
 		printf("write_ip:%d.%d.%d.%d,gate:%d.%d.%d.%d,mask:%d.%d.%d.%d\n",
 			cfg.IP_addr[0],cfg.IP_addr[1],cfg.IP_addr[2],cfg.IP_addr[3],
 			cfg.GateWay[0],cfg.GateWay[1],cfg.GateWay[2],cfg.GateWay[3],
 			cfg.Mask[0],cfg.Mask[1],cfg.Mask[2],cfg.Mask[3]);	
 		
-		//send data 
+		//发送数据 
 		if(!SendCommand(NVILIDAR_NET_CONFIG_WRITE_CMD,(void *)&cfg,sizeof(Nvilidar_NetConfigTypeDef)))
 		{	
 			return false;
 		}
-		//wait for response 
+		//等待应答 
 		delayMS(500);
-		//read the response data 
+		//读取应答值  
 		if(false == GetDataResponse())
 		{
 			return false;
 		}
 
-		//result 
+		//应答结果 
 		return true;
 	}
 
-	//get config para 
+	//读取参数信息 
     bool LidarDriverNetConfig::LidarNetConfigRead(std::string &ip,std::string &gate,std::string &mask)
 	{
-		//send data  
+		//发送数据 
 		if(!SendCommand(NVILIDAR_NET_CONFIG_READ_CMD))
 		{
 			return false;
 		}
 		
-		//wait for response 
+		//等待应答 
 		delayMS(500);
-		//read the response data 
+		//读取应答值  
 		if(false == GetDataResponse())
 		{
 			return false;
 		}
 
-		//ip to string 
+		//转换 
 		ip = ip_char2str(&net_config_para.IP_addr[0]);
 		gate = ip_char2str(&net_config_para.GateWay[0]);
 		mask = ip_char2str(&net_config_para.Mask[0]);	
@@ -247,19 +249,8 @@ namespace nvilidar
 				}
 				case 1:		//第2个字节  
 				{
-					if (
-							(byte == NVILIDAR_NET_CONFIG_WRITE_CMD) ||
-							(byte == NVILIDAR_NET_CONFIG_READ_CMD) 
-					   )
-					{
-						normalResponseData.cmd = byte;
-						recvPos++;
-					}
-					else
-					{
-						normalResponseData.cmd = 0;
-						recvPos=0;
-					}
+					normalResponseData.cmd = byte;
+					recvPos++;
 					break;
 				}
 				case 2:		//第3个字节  

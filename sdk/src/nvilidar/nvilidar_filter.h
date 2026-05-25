@@ -3,7 +3,7 @@
 #include "nvilidar_def.h"
 #include "nvilidar_protocol.h"
 
-//---visual studio include lib file 
+//---定义库信息 VS系列的生成库文件  
 #ifdef WIN32
 	#define NVILIDAR_FILTER_API __declspec(dllexport)
 #else
@@ -17,18 +17,13 @@ namespace nvilidar
 	class  NVILIDAR_FILTER_API LidarFilter
     {
 		public:
-			static LidarFilter *instance();
-
-			void LidarFilterLoadPara(FilterPara cfg);		//load fit para 
-			bool LidarNoiseFilter(std::vector<Nvilidar_Node_Info> in,std::vector<Nvilidar_Node_Info> &out);
-    		bool LidarTailFilter(TailFilterPara para,std::vector<Nvilidar_Node_Info> in,std::vector<Nvilidar_Node_Info> &out);
-    		bool LidarSlidingFilter(SlidingFilterPara para,std::vector<Nvilidar_Node_Info> in,std::vector<Nvilidar_Node_Info> &out);
-
-		private:
-			FilterPara     lidar_filter_cfg;				//lidar filter config parameter 
 			LidarFilter();		
 			~LidarFilter();
 
-			static LidarFilter *_instance;
+			void LidarFilterLoadPara(Nvilidar_UserConfigTypeDef cfg);			//加载参数信息
+			void LidarJumpFilter(std::vector<Nvilidar_Node_Info> &in);		//跳动点过滤 
+
+		private:
+			Nvilidar_UserConfigTypeDef     lidar_cfg;				//雷达型号
     };
 }
